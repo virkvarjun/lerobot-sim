@@ -11,6 +11,8 @@ export interface SimState {
   ee_pos: [number, number, number];
   ee_quat: [number, number, number, number];
   ee_speed_mps: number;
+  gripper_open: boolean;
+  cube_pos: [number, number, number];
   status: "READY" | "RUNNING" | "PAUSED" | "ERROR";
   mode: "SIM";
   loop_hz: number;

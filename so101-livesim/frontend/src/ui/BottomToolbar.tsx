@@ -1,39 +1,25 @@
 import React from "react";
 import { sendCommand } from "../ws";
 
-/** Bottom toolbar with circular and square icon buttons. */
+/** Bottom toolbar — light HUD panel strip with icon buttons. */
 export default function BottomToolbar() {
   return (
-    <div className="bottom-toolbar">
-      {/* Circular buttons */}
-      <button className="toolbar-btn-circle" title="Play" onClick={() => sendCommand({ type: "play" })}>
-        <PlayIcon />
-      </button>
-      <button className="toolbar-btn-circle" title="Menu">
-        <MenuIcon />
-      </button>
-      <button className="toolbar-btn-circle" title="Pause" onClick={() => sendCommand({ type: "pause" })}>
-        <PauseIcon />
-      </button>
-      <button className="toolbar-btn-circle" title="Reset" onClick={() => sendCommand({ type: "reset" })}>
-        <RefreshIcon />
-      </button>
+    <div className="bottom-toolbar hud-panel">
+      <div className="hud-panel-inner">
+        {/* Large circular buttons */}
+        <button className="tb-circle" title="Play"  onClick={() => sendCommand({ type: "play" })}><PlayIcon /></button>
+        <button className="tb-circle" title="Menu"><MenuIcon /></button>
+        <button className="tb-circle" title="Pause" onClick={() => sendCommand({ type: "pause" })}><PauseIcon /></button>
+        <button className="tb-circle" title="Reset" onClick={() => sendCommand({ type: "reset" })}><RefreshIcon /></button>
 
-      <div className="toolbar-divider" />
+        <div className="tb-divider" />
 
-      {/* Square buttons */}
-      <button className="toolbar-btn-square" title="Settings">
-        <GearSmallIcon />
-      </button>
-      <button className="toolbar-btn-square" title="Warnings">
-        <WarningIcon />
-      </button>
-      <button className="toolbar-btn-square" title="Fullscreen">
-        <ExpandIcon />
-      </button>
-      <button className="toolbar-btn-square" title="Stop">
-        <StopIcon />
-      </button>
+        {/* Small square buttons */}
+        <button className="tb-square" title="Settings"><GearIcon /></button>
+        <button className="tb-square" title="Warnings"><WarningIcon /></button>
+        <button className="tb-square" title="Fullscreen"><ExpandIcon /></button>
+        <button className="tb-square" title="Stop"><StopIcon /></button>
+      </div>
     </div>
   );
 }
@@ -42,9 +28,7 @@ export default function BottomToolbar() {
 
 function PlayIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor">
-      <polygon points="6,3 20,12 6,21" />
-    </svg>
+    <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,3 20,12 6,21" /></svg>
   );
 }
 
@@ -76,7 +60,7 @@ function RefreshIcon() {
   );
 }
 
-function GearSmallIcon() {
+function GearIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="3" />
@@ -108,8 +92,6 @@ function ExpandIcon() {
 
 function StopIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor">
-      <rect x="4" y="4" width="16" height="16" rx="2" />
-    </svg>
+    <svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2" /></svg>
   );
 }

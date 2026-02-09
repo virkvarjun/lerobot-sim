@@ -34,17 +34,19 @@ export default function App() {
       <TopBar state={state} />
 
       <div className="main-area">
-        {/* Left: 3D scene — ~75% width */}
+        {/* Left: 3D scene — ~76% using flex */}
         <div className="scene-column">
-          <div className="panel scene-panel">
-            <div className="panel-body">
-              <div className="scene-label">3D Simulator Area</div>
-              <Scene3D jointPositions={joints} />
+          <div className="hud-panel scene-panel">
+            <div className="hud-panel-inner">
+              <div className="hud-body">
+                <div className="scene-label">3D Simulator Area</div>
+                <Scene3D jointPositions={joints} />
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Right: control panels */}
+        {/* Right: 3 stacked control panels */}
         <div className="right-column">
           <RightPanels state={state} speedHistory={speedHistory} />
         </div>

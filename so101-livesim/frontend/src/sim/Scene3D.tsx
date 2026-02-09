@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, GizmoHelper, GizmoViewport, Line } from "@react-three/drei";
 import * as THREE from "three";
@@ -61,10 +61,10 @@ function SceneContent({ jointPositions, gripperOpen }: {
       <Line points={[[-1, 0.001, 0], [1, 0.001, 0]]} color="#5a3030" lineWidth={1} transparent opacity={0.35} />
       <Line points={[[0, 0.001, -1], [0, 0.001, 1]]} color="#305a30" lineWidth={1} transparent opacity={0.35} />
 
-      {/* Cube — tracks gripper tip position from the 3D scene */}
-      <PickupCube gripped={!gripperOpen} gripperPosRef={gripperPosRef} />
+      {/* Cube — attaches to gripper only when gripper is close AND closed */}
+      <PickupCube gripperClosed={!gripperOpen} gripperPosRef={gripperPosRef} />
 
-      {/* Robot arm */}
+      {/* Robot arm — exports gripper tip world position */}
       <RobotArmPlaceholder jointsRef={joints} gripperPosRef={gripperPosRef} />
 
       {/* Controls */}
@@ -79,39 +79,54 @@ function SceneContent({ jointPositions, gripperOpen }: {
 }
 
 /**
- * Animated pickup cube.
+ * Pickup cube that sits on the floor.
  *
- * - Starts on the floor in front of the arm.
- * - When gripped, follows the gripper tip's world position.
- * - When released, stays at the drop location.
+ * The cube only attaches to the gripper when two conditions are met:
+ *   1. The gripper is closed (gripperClosed === true)
+ *   2. The gripper tip is physically close to the cube (distance < threshold)
+ *
+ * This prevents the cube from teleporting into the gripper — the arm must
+ * actually reach down to the cube first.
  */
-function PickupCube({ gripped, gripperPosRef }: {
-  gripped: boolean;
+function PickupCube({ gripperClosed, gripperPosRef }: {
+  gripperClosed: boolean;
   gripperPosRef: React.MutableRefObject<THREE.Vector3>;
 }) {
-  // Initial cube position — on the floor, within arm's reach
-  const CUBE_START = React.useMemo(() => new THREE.Vector3(0.35, 0.04, 0.25), []);
+  // Cube starts on the floor, to the right of the arm — matching where
+  // the gripper reaches at waypoint 1 ([0, -1.5, -0.4, 0, 0, 0]).
+  // Computed: scene x ≈ 1.10, y ≈ 0.0.  Cube center at y=0.04 (half height).
+  const CUBE_START = useMemo(() => new THREE.Vector3(1.1, 0.04, 0), []);
+  const ATTACH_DIST = 0.2; // scene units — gripper must be within this to grab
 
   const meshRef = useRef<THREE.Mesh>(null!);
   const restPos = useRef(CUBE_START.clone());
-  const wasGripped = useRef(false);
+  const attached = useRef(false);
 
   useFrame(() => {
     if (!meshRef.current) return;
 
-    if (gripped) {
+    const cubePos = meshRef.current.position;
+    const gripperPos = gripperPosRef.current;
+    const dist = cubePos.distanceTo(gripperPos);
+
+    if (gripperClosed && dist < ATTACH_DIST && !attached.current) {
+      // Gripper closed near cube — latch on
+      attached.current = true;
+    }
+
+    if (!gripperClosed && attached.current) {
+      // Gripper opened — drop cube
+      attached.current = false;
+      restPos.current.copy(cubePos);
+      restPos.current.y = Math.max(restPos.current.y, 0.04);
+    }
+
+    if (attached.current) {
       // Follow the gripper tip
-      meshRef.current.position.lerp(gripperPosRef.current, 0.25);
-      wasGripped.current = true;
+      cubePos.lerp(gripperPos, 0.3);
     } else {
-      if (wasGripped.current) {
-        // Just released — record drop position, clamp to floor
-        restPos.current.copy(meshRef.current.position);
-        restPos.current.y = Math.max(restPos.current.y, 0.04);
-        wasGripped.current = false;
-      }
-      // Settle toward resting position
-      meshRef.current.position.lerp(restPos.current, 0.12);
+      // Settle toward rest position
+      cubePos.lerp(restPos.current, 0.12);
     }
   });
 
@@ -119,11 +134,11 @@ function PickupCube({ gripped, gripperPosRef }: {
     <mesh ref={meshRef} position={CUBE_START.toArray()}>
       <boxGeometry args={[0.08, 0.08, 0.08]} />
       <meshStandardMaterial
-        color={gripped ? "#e8a030" : "#e07020"}
+        color={attached.current ? "#e8a030" : "#e07020"}
         metalness={0.1}
         roughness={0.5}
-        emissive={gripped ? "#e8a030" : "#e07020"}
-        emissiveIntensity={gripped ? 0.15 : 0.05}
+        emissive={attached.current ? "#e8a030" : "#e07020"}
+        emissiveIntensity={attached.current ? 0.15 : 0.05}
       />
     </mesh>
   );

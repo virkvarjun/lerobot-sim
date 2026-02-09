@@ -42,7 +42,7 @@ async def broadcast(state: SimState) -> None:
         return
     data = state.model_dump_json()
     stale: list[WebSocket] = []
-    for ws in clients:
+    for ws in list(clients):
         try:
             await ws.send_text(data)
         except Exception:

@@ -340,6 +340,8 @@ html, body, #root {
 }
 .btn:hover { background: #3e839c; }
 .btn:active { transform: scale(0.97); }
+.btn-accent { background: #e07020; }
+.btn-accent:hover { background: #c85e18; }
 
 /* ======================== SLIDERS ======================== */
 

@@ -75,8 +75,7 @@ export default function RightPanels({ state, speedHistory }: Props) {
           <button className="btn" onClick={cmd("play")}>Play</button>
           <button className="btn" onClick={cmd("pause")}>Pause</button>
           <button className="btn" onClick={cmd("reset")}>Reset</button>
-          <button className="btn" onClick={() => {}}>Record</button>
-          <button className="btn" onClick={() => {}}>Replay</button>
+          <button className="btn btn-accent" onClick={cmd("pick_place")}>Pick &amp; Place</button>
         </div>
         {(["P1", "P2", "P3", "P4", "P5"] as const).map((k) => (
           <div className="slider-row" key={k}>

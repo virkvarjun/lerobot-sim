@@ -5,7 +5,7 @@ interface TopBarProps {
   state: SimState | null;
 }
 
-/** Top status bar with logo, status pills, and settings button. */
+/** Light-themed top status bar with logo, pills, and settings button. */
 export default function TopBar({ state }: TopBarProps) {
   const status = state?.status ?? "READY";
   const mode = state?.mode ?? "SIM";

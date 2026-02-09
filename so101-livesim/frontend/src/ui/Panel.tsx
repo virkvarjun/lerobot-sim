@@ -6,11 +6,16 @@ interface PanelProps {
   className?: string;
 }
 
-/** Reusable panel card matching the reference design. */
+/** Reusable panel card with double-border and header ellipsis icon. */
 export default function Panel({ title, children, className = "" }: PanelProps) {
   return (
     <div className={`panel ${className}`}>
-      <div className="panel-header">{title}</div>
+      <div className="panel-header">
+        <span>{title}</span>
+        <div className="panel-header-dots">
+          <span /><span /><span />
+        </div>
+      </div>
       <div className="panel-body">{children}</div>
     </div>
   );

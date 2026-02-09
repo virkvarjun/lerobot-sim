@@ -1,6 +1,7 @@
 import React from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, GizmoHelper, GizmoViewport } from "@react-three/drei";
+import { OrbitControls, GizmoHelper, GizmoViewport, Line } from "@react-three/drei";
+import * as THREE from "three";
 import GridFloor from "./GridFloor";
 import RobotArmPlaceholder from "./RobotArmPlaceholder";
 import { useInterpolatedJoints } from "./useInterpolatedState";
@@ -10,8 +11,8 @@ interface Scene3DProps {
 }
 
 /**
- * Three.js scene: dark background, grid floor, orbit controls,
- * subtle axes gizmo, and the placeholder robot arm.
+ * 3D scene with dark background, grid, subtle bounding box,
+ * and the white robot arm.
  */
 export default function Scene3D({ jointPositions }: Scene3DProps) {
   return (
@@ -26,38 +27,38 @@ export default function Scene3D({ jointPositions }: Scene3DProps) {
   );
 }
 
-/** Inner component so hooks can run inside the Canvas context. */
 function SceneContent({ jointPositions }: { jointPositions: number[] }) {
   const { joints, push } = useInterpolatedJoints(6, 0.18);
 
-  // Push new positions whenever they change
   React.useEffect(() => {
     push(jointPositions);
   }, [jointPositions, push]);
 
   return (
     <>
-      {/* Lighting */}
+      {/* Background */}
       <color attach="background" args={["#1a1d23"]} />
-      <ambientLight intensity={0.4} />
-      <directionalLight position={[5, 8, 5]} intensity={0.8} castShadow />
-      <directionalLight position={[-3, 4, -2]} intensity={0.3} />
-      <pointLight position={[0, 3, 0]} intensity={0.2} color="#4b99b7" />
+
+      {/* Lighting — brighter to make white robot stand out */}
+      <ambientLight intensity={0.55} />
+      <directionalLight position={[5, 8, 5]} intensity={0.9} />
+      <directionalLight position={[-3, 6, -2]} intensity={0.35} />
+      <pointLight position={[0, 3, 0]} intensity={0.15} color="#4b99b7" />
 
       {/* Floor grid */}
       <GridFloor />
 
-      {/* Bounding box wireframe like the reference */}
-      <lineSegments>
-        <edgesGeometry args={[new THREE.BoxGeometry(1.5, 2.0, 1.5)]} />
-        <lineBasicMaterial color="#3a5f6f" transparent opacity={0.25} />
-      </lineSegments>
-      <group position={[0, 1.0, 0]}>
+      {/* Bounding box wireframe — centered on robot workspace */}
+      <group position={[0, 0.85, 0]}>
         <lineSegments>
-          <edgesGeometry args={[new THREE.BoxGeometry(1.5, 2.0, 1.5)]} />
-          <lineBasicMaterial color="#3a5f6f" transparent opacity={0.15} />
+          <edgesGeometry args={[new THREE.BoxGeometry(1.4, 1.7, 1.4)]} />
+          <lineBasicMaterial color="#3a5f6f" transparent opacity={0.2} />
         </lineSegments>
       </group>
+
+      {/* Subtle axis lines on floor */}
+      <Line points={[[-1, 0.001, 0], [1, 0.001, 0]]} color="#5a3030" lineWidth={1} transparent opacity={0.35} />
+      <Line points={[[0, 0.001, -1], [0, 0.001, 1]]} color="#305a30" lineWidth={1} transparent opacity={0.35} />
 
       {/* Robot arm */}
       <RobotArmPlaceholder jointsRef={joints} />
@@ -81,6 +82,3 @@ function SceneContent({ jointPositions }: { jointPositions: number[] }) {
     </>
   );
 }
-
-// Need THREE for the box geometry in the bounding wireframe
-import * as THREE from "three";

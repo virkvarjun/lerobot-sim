@@ -100,6 +100,25 @@ To load the real SO-101 URDF:
 3. On the backend, replace `robot_kinematics.py` with a proper FK solver (e.g. Pinocchio or `yourdfpy`)
 4. No other changes needed — the joint position array drives everything
 
+## UI Theming
+
+All colours and spacing are defined as CSS custom properties in `frontend/src/styles.css`:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `--bg` | `#d9dada` | Page background (light gray) |
+| `--panel-bg` | `#fcfcfc` | Panel fill (off-white) |
+| `--panel-border` | `#303030` | Outer border (dark gray) |
+| `--panel-accent` | `#4b99b7` | Inner accent border (teal-blue) |
+| `--accent` | `#4b99b7` | Buttons, sliders, highlights |
+| `--accent-hover` | `#3e839c` | Button hover state |
+| `--scene-bg` | `#1a1d23` | 3D canvas background |
+| `--radius` | `10px` | Panel corner radius |
+| `--sp` | `12px` | Base spacing unit |
+| `--gap` | `12px` | Grid gap between panels |
+
+Every panel uses a **double-border** treatment: a 2px outer `--panel-border` + a 2px inner `--panel-accent` (via `box-shadow: inset`). To tweak the theme, edit the `:root` block in `styles.css`.
+
 ## Tech Stack
 
 - **Backend**: Python, FastAPI, WebSocket, Pydantic, Uvicorn

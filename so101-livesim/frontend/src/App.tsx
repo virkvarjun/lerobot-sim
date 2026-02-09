@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import TopBar from "./ui/TopBar";
 import RightPanels from "./ui/RightPanels";
 import BottomToolbar from "./ui/BottomToolbar";
@@ -12,12 +12,10 @@ export default function App() {
   const [speedHistory, setSpeedHistory] = useState<{ t: number; v: number }[]>([]);
   const tickRef = useRef(0);
 
-  // Subscribe to WebSocket state updates
   useEffect(() => {
     const unsub = subscribe((s) => {
       setState(s);
       tickRef.current += 1;
-      // Downsample speed history to avoid too many data points
       if (tickRef.current % 3 === 0) {
         setSpeedHistory((prev) => {
           const next = [...prev, { t: tickRef.current, v: s.ee_speed_mps }];
@@ -36,7 +34,7 @@ export default function App() {
       <TopBar state={state} />
 
       <div className="main-area">
-        {/* Left: 3D scene */}
+        {/* Left: 3D scene — ~75% width */}
         <div className="scene-column">
           <div className="panel scene-panel">
             <div className="panel-body">

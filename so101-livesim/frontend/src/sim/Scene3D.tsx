@@ -8,29 +8,28 @@ import { useInterpolatedJoints } from "./useInterpolatedState";
 
 interface Scene3DProps {
   jointPositions: number[];
-  cubePos: [number, number, number];
   gripperOpen: boolean;
 }
 
-export default function Scene3D({ jointPositions, cubePos, gripperOpen }: Scene3DProps) {
+export default function Scene3D({ jointPositions, gripperOpen }: Scene3DProps) {
   return (
     <div className="scene-canvas-wrap">
       <Canvas
         camera={{ position: [1.5, 1.8, 2.2], fov: 45, near: 0.01, far: 100 }}
         gl={{ antialias: true }}
       >
-        <SceneContent jointPositions={jointPositions} cubePos={cubePos} gripperOpen={gripperOpen} />
+        <SceneContent jointPositions={jointPositions} gripperOpen={gripperOpen} />
       </Canvas>
     </div>
   );
 }
 
-function SceneContent({ jointPositions, cubePos, gripperOpen }: {
+function SceneContent({ jointPositions, gripperOpen }: {
   jointPositions: number[];
-  cubePos: [number, number, number];
   gripperOpen: boolean;
 }) {
   const { joints, push } = useInterpolatedJoints(6, 0.18);
+  const gripperPosRef = useRef(new THREE.Vector3(0, 1.4, 0));
 
   React.useEffect(() => {
     push(jointPositions);
@@ -62,11 +61,11 @@ function SceneContent({ jointPositions, cubePos, gripperOpen }: {
       <Line points={[[-1, 0.001, 0], [1, 0.001, 0]]} color="#5a3030" lineWidth={1} transparent opacity={0.35} />
       <Line points={[[0, 0.001, -1], [0, 0.001, 1]]} color="#305a30" lineWidth={1} transparent opacity={0.35} />
 
-      {/* Cube */}
-      <PickupCube position={cubePos} gripped={!gripperOpen} />
+      {/* Cube — tracks gripper tip position from the 3D scene */}
+      <PickupCube gripped={!gripperOpen} gripperPosRef={gripperPosRef} />
 
       {/* Robot arm */}
-      <RobotArmPlaceholder jointsRef={joints} />
+      <RobotArmPlaceholder jointsRef={joints} gripperPosRef={gripperPosRef} />
 
       {/* Controls */}
       <OrbitControls enableDamping dampingFactor={0.12} minDistance={0.5} maxDistance={8} target={[0, 0.6, 0]} />
@@ -79,23 +78,45 @@ function SceneContent({ jointPositions, cubePos, gripperOpen }: {
   );
 }
 
-/** Animated pickup cube that smoothly follows its server-side position. */
-function PickupCube({ position, gripped }: { position: [number, number, number]; gripped: boolean }) {
-  const meshRef = useRef<THREE.Mesh>(null!);
-  const target = useRef(new THREE.Vector3(...position));
+/**
+ * Animated pickup cube.
+ *
+ * - Starts on the floor in front of the arm.
+ * - When gripped, follows the gripper tip's world position.
+ * - When released, stays at the drop location.
+ */
+function PickupCube({ gripped, gripperPosRef }: {
+  gripped: boolean;
+  gripperPosRef: React.MutableRefObject<THREE.Vector3>;
+}) {
+  // Initial cube position — on the floor, within arm's reach
+  const CUBE_START = React.useMemo(() => new THREE.Vector3(0.35, 0.04, 0.25), []);
 
-  React.useEffect(() => {
-    // Scale cube pos from robot-frame (metres) to scene units (×2.8 scale)
-    target.current.set(position[0] * 2.8, Math.max(position[1] * 2.8, 0.04), position[2] * 2.8);
-  }, [position]);
+  const meshRef = useRef<THREE.Mesh>(null!);
+  const restPos = useRef(CUBE_START.clone());
+  const wasGripped = useRef(false);
 
   useFrame(() => {
     if (!meshRef.current) return;
-    meshRef.current.position.lerp(target.current, 0.15);
+
+    if (gripped) {
+      // Follow the gripper tip
+      meshRef.current.position.lerp(gripperPosRef.current, 0.25);
+      wasGripped.current = true;
+    } else {
+      if (wasGripped.current) {
+        // Just released — record drop position, clamp to floor
+        restPos.current.copy(meshRef.current.position);
+        restPos.current.y = Math.max(restPos.current.y, 0.04);
+        wasGripped.current = false;
+      }
+      // Settle toward resting position
+      meshRef.current.position.lerp(restPos.current, 0.12);
+    }
   });
 
   return (
-    <mesh ref={meshRef} position={[position[0] * 2.8, Math.max(position[1] * 2.8, 0.04), position[2] * 2.8]}>
+    <mesh ref={meshRef} position={CUBE_START.toArray()}>
       <boxGeometry args={[0.08, 0.08, 0.08]} />
       <meshStandardMaterial
         color={gripped ? "#e8a030" : "#e07020"}

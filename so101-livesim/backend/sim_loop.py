@@ -3,6 +3,9 @@ Core simulation loop.
 
 Runs at ~60 Hz in a background asyncio task and produces SimState
 snapshots that the WebSocket broadcaster pushes to all clients.
+
+Play triggers a pick-and-place demo: the robot reaches for a cube,
+grips it, moves it to a new location, releases, and returns home.
 """
 
 from __future__ import annotations
@@ -16,7 +19,6 @@ from config import (
     DEFAULT_PARAMS,
     NUM_JOINTS,
     SIM_LOOP_HZ,
-    SMOOTHING_ALPHA,
 )
 from messages import RobotStatus, SimState
 from robot_kinematics import forward_kinematics
@@ -25,28 +27,35 @@ from robot_kinematics import forward_kinematics
 # ---- pick-and-place waypoints (joint-space, radians) ----
 # Each waypoint: (joints[6], gripper_open, hold_ticks)
 _PICK_PLACE_SEQ: list[tuple[list[float], bool, int]] = [
-    # 0  Home above cube
-    ([0.4, -0.3, -0.6, 0.0, -0.3, 0.0], True, 40),
-    # 1  Lower to cube
-    ([0.4, -0.5, -0.8, 0.0, -0.1, 0.0], True, 30),
-    # 2  Close gripper
-    ([0.4, -0.5, -0.8, 0.0, -0.1, 0.0], False, 30),
-    # 3  Lift up
-    ([0.4, -0.2, -0.5, 0.0, -0.3, 0.0], False, 30),
+    # 0  Move above cube
+    ([0.3, -0.25, -0.45, 0.0, -0.25, 0.0], True, 30),
+    # 1  Lower toward cube
+    ([0.3, -0.40, -0.60, 0.0, -0.10, 0.0], True, 25),
+    # 2  Close gripper on cube
+    ([0.3, -0.40, -0.60, 0.0, -0.10, 0.0], False, 35),
+    # 3  Lift cube up
+    ([0.3, -0.15, -0.35, 0.0, -0.25, 0.0], False, 30),
     # 4  Swing to drop position
-    ([-0.5, -0.2, -0.5, 0.0, -0.3, 0.0], False, 40),
-    # 5  Lower to drop
-    ([-0.5, -0.5, -0.8, 0.0, -0.1, 0.0], False, 30),
-    # 6  Open gripper
-    ([-0.5, -0.5, -0.8, 0.0, -0.1, 0.0], True, 30),
-    # 7  Lift away
-    ([-0.5, -0.2, -0.5, 0.0, -0.3, 0.0], True, 30),
+    ([-0.4, -0.15, -0.35, 0.0, -0.25, 0.0], False, 35),
+    # 5  Lower to drop height
+    ([-0.4, -0.40, -0.60, 0.0, -0.10, 0.0], False, 25),
+    # 6  Open gripper — release cube
+    ([-0.4, -0.40, -0.60, 0.0, -0.10, 0.0], True, 30),
+    # 7  Lift away from cube
+    ([-0.4, -0.15, -0.35, 0.0, -0.25, 0.0], True, 25),
     # 8  Return home
     ([0.0, 0.0, 0.0, 0.0, 0.0, 0.0], True, 40),
 ]
 
-# Cube initial position (in robot-frame metres, approximate)
-_CUBE_START = (0.15, 0.05, 0.1)
+# Smoothing factor — higher = faster convergence
+_ALPHA = 0.18
+
+
+def _compute_cube_start() -> list[float]:
+    """Place the cube where the arm's EE is at waypoint 1 (pre-grip)."""
+    wp_joints = _PICK_PLACE_SEQ[1][0]
+    ee_pos, _ = forward_kinematics(wp_joints)
+    return [ee_pos[0], max(ee_pos[1], 0.025), ee_pos[2]]
 
 
 class SimLoop:
@@ -63,10 +72,10 @@ class SimLoop:
 
         # Gripper + cube
         self.gripper_open: bool = True
-        self.cube_pos: list[float] = list(_CUBE_START)
+        self._cube_start: list[float] = _compute_cube_start()
+        self.cube_pos: list[float] = list(self._cube_start)
 
         # Pick-and-place sequence state
-        self._pp_active: bool = False
         self._pp_step: int = 0
         self._pp_hold: int = 0
 
@@ -82,7 +91,12 @@ class SimLoop:
     # ---- public commands ----
 
     def play(self) -> None:
+        """Start (or restart) the pick-and-place demo."""
         self.status = RobotStatus.RUNNING
+        self.gripper_open = True
+        self.cube_pos = list(self._cube_start)
+        self._pp_step = 0
+        self._pp_hold = 0
 
     def pause(self) -> None:
         self.status = RobotStatus.PAUSED
@@ -92,8 +106,7 @@ class SimLoop:
         self.joint_positions = [0.0] * NUM_JOINTS
         self.joint_targets = [0.0] * NUM_JOINTS
         self.gripper_open = True
-        self.cube_pos = list(_CUBE_START)
-        self._pp_active = False
+        self.cube_pos = list(self._cube_start)
         self._pp_step = 0
         self._pp_hold = 0
         self._prev_ee_pos = (0.0, 0.0, 0.0)
@@ -110,49 +123,30 @@ class SimLoop:
             self.joint_targets = list(targets)
 
     def pick_place(self) -> None:
-        """Start the pick-and-place demonstration sequence."""
-        self.status = RobotStatus.RUNNING
-        self.cube_pos = list(_CUBE_START)
-        self.gripper_open = True
-        self._pp_active = True
-        self._pp_step = 0
-        self._pp_hold = 0
+        """Alias — same as play."""
+        self.play()
 
     # ---- internal step ----
-
-    def _generate_targets(self) -> None:
-        """Sine-wave default motion when no sequence is active."""
-        t = self._tick / self.hz
-        base_freqs = [0.3, 0.25, 0.35, 0.4, 0.2, 0.15]
-        base_amps = [1.0, 0.8, 0.7, 1.2, 0.6, 0.9]
-
-        amp_scale = 0.2 + self.params["P1"] * 0.8
-        freq_scale = 0.5 + self.params["P2"] * 1.5
-
-        for i in range(NUM_JOINTS):
-            self.joint_targets[i] = (
-                base_amps[i] * amp_scale
-                * math.sin(2 * math.pi * base_freqs[i] * freq_scale * t + i * 0.7)
-            )
 
     def _step_pick_place(self) -> None:
         """Advance the pick-and-place sequence one tick."""
         if self._pp_step >= len(_PICK_PLACE_SEQ):
-            # Sequence complete
-            self._pp_active = False
+            # Sequence complete — stop
             self.status = RobotStatus.READY
             return
 
         wp_joints, wp_gripper, wp_hold = _PICK_PLACE_SEQ[self._pp_step]
 
-        # Set targets and gripper
+        # Set targets and gripper state
         self.joint_targets = list(wp_joints)
         self.gripper_open = wp_gripper
 
         # Check if joints are close enough to the waypoint
-        err = sum(abs(self.joint_positions[i] - wp_joints[i]) for i in range(NUM_JOINTS))
-        if err < 0.15:
-            # Hold at waypoint
+        err = sum(
+            abs(self.joint_positions[i] - wp_joints[i])
+            for i in range(NUM_JOINTS)
+        )
+        if err < 0.08:
             self._pp_hold += 1
             if self._pp_hold >= wp_hold:
                 self._pp_step += 1
@@ -165,16 +159,12 @@ class SimLoop:
         self._last_time = now
 
         if self.status == RobotStatus.RUNNING:
-            if self._pp_active:
-                self._step_pick_place()
-            else:
-                self._generate_targets()
+            self._step_pick_place()
 
             # Smooth joint positions toward targets
-            alpha = SMOOTHING_ALPHA
             for i in range(NUM_JOINTS):
                 diff = self.joint_targets[i] - self.joint_positions[i]
-                self.joint_positions[i] += alpha * diff
+                self.joint_positions[i] += _ALPHA * diff
             self._tick += 1
 
         # Forward kinematics

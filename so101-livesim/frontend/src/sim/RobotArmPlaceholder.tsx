@@ -14,6 +14,8 @@ import * as THREE from "three";
 
 interface Props {
   jointsRef: React.MutableRefObject<number[]>;
+  /** Updated each frame with the gripper tip's world position. */
+  gripperPosRef?: React.MutableRefObject<THREE.Vector3>;
 }
 
 // Colours matching the real SO-101
@@ -26,13 +28,14 @@ const ACCENT = "#4b99b7";
 // Scale factor
 const S = 2.8;
 
-export default function RobotArmPlaceholder({ jointsRef }: Props) {
+export default function RobotArmPlaceholder({ jointsRef, gripperPosRef }: Props) {
   const j0 = useRef<THREE.Group>(null!);
   const j1 = useRef<THREE.Group>(null!);
   const j2 = useRef<THREE.Group>(null!);
   const j3 = useRef<THREE.Group>(null!);
   const j4 = useRef<THREE.Group>(null!);
   const j5 = useRef<THREE.Group>(null!);
+  const gripTipRef = useRef<THREE.Group>(null!);
 
   useFrame(() => {
     const q = jointsRef.current;
@@ -43,6 +46,11 @@ export default function RobotArmPlaceholder({ jointsRef }: Props) {
     j3.current.rotation.y = q[3];
     j4.current.rotation.z = q[4];
     j5.current.rotation.y = q[5];
+
+    // Export gripper tip world position
+    if (gripperPosRef && gripTipRef.current) {
+      gripTipRef.current.getWorldPosition(gripperPosRef.current);
+    }
   });
 
   return (
@@ -134,6 +142,9 @@ export default function RobotArmPlaceholder({ jointsRef }: Props) {
 
                   {/* Gripper servo (tiny, at base) */}
                   <Servo w={0.015} h={0.02} d={0.015} y={0.01} z={-0.012} />
+
+                  {/* Invisible gripper tip — used to track world position */}
+                  <group ref={gripTipRef} position={[0, 0.045, 0]} />
                 </group>
               </group>
             </group>

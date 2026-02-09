@@ -28,7 +28,6 @@ export default function App() {
   }, []);
 
   const joints = state?.joint_positions ?? [0, 0, 0, 0, 0, 0];
-  const cubePos = state?.cube_pos ?? [0.15, 0.05, 0.1] as [number, number, number];
   const gripperOpen = state?.gripper_open ?? true;
 
   return (
@@ -42,7 +41,7 @@ export default function App() {
             <div className="hud-panel-inner">
               <div className="hud-body">
                 <div className="scene-label">3D Simulator Area</div>
-                <Scene3D jointPositions={joints} cubePos={cubePos as [number, number, number]} gripperOpen={gripperOpen} />
+                <Scene3D jointPositions={joints} gripperOpen={gripperOpen} />
               </div>
             </div>
           </div>

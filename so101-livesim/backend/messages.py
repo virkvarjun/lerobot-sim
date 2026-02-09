@@ -36,6 +36,8 @@ class SimState(BaseModel):
     ee_pos: tuple[float, float, float]
     ee_quat: tuple[float, float, float, float]
     ee_speed_mps: float = 0.0
+    gripper_open: bool = True
+    cube_pos: tuple[float, float, float] = (0.2, 0.0, 0.0)
     status: RobotStatus = RobotStatus.READY
     mode: RobotMode = RobotMode.SIM
     loop_hz: int = 60
@@ -69,8 +71,12 @@ class SetJointTargetsCmd(BaseModel):
     targets: list[float] = Field(..., min_length=6, max_length=6)
 
 
+class PickPlaceCmd(BaseModel):
+    type: Literal["pick_place"] = "pick_place"
+
+
 # Discriminated union of all inbound commands
-UICommand = PlayCmd | PauseCmd | ResetCmd | SetParamsCmd | SetJointTargetsCmd
+UICommand = PlayCmd | PauseCmd | ResetCmd | SetParamsCmd | SetJointTargetsCmd | PickPlaceCmd
 
 
 def parse_command(raw: dict) -> UICommand:
@@ -82,6 +88,7 @@ def parse_command(raw: dict) -> UICommand:
         "reset": ResetCmd,
         "set_params": SetParamsCmd,
         "set_joint_targets": SetJointTargetsCmd,
+        "pick_place": PickPlaceCmd,
     }
     model = dispatch.get(cmd_type)  # type: ignore[arg-type]
     if model is None:

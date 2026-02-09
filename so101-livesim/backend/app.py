@@ -97,6 +97,8 @@ def _handle_command(cmd) -> None:  # type: ignore[type-arg]
             sim.set_params(cmd.params)
         case "set_joint_targets":
             sim.set_joint_targets(cmd.targets)
+        case "pick_place":
+            sim.pick_place()
 
 
 # ---------- health check ----------
